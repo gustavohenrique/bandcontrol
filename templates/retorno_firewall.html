@@ -1,0 +1,26 @@
+{% extends 'admin/change_list.html' %}
+
+
+{% block title %}Administração do Servidor{% endblock %}
+
+{% block breadcrumbs %}
+    <div class="breadcrumbs">
+        <a href="../">Voltar</a>
+    </div>
+{% endblock %}
+
+{% block content %}
+
+<h1>Resposta do Servidor</h1>
+
+<div id="content-main">
+    <p class="paginator">
+        {% if msg %}
+            {{ msg }}
+        {% else %}
+            Nenhuma resposta do servidor.<br>
+            Provavelmente algum erro ocorreu. Verifique os arquivos de log.
+        {% endif %}
+    </p>
+</div>
+{% endblock %}

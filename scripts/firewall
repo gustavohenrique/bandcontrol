@@ -1,0 +1,236 @@
+#!/bin/bash
+
+. "$(dirname $0)/CONFIG"
+
+
+# Remove o controle de banda
+function destruir_trafego {
+    $TC qdisc del dev $I_LAN1 root
+    $TC qdisc del dev $I_WAN root
+}
+
+# Cria as regras iniciais para controle de banda
+function criar_trafego {
+    # Remove as regras do controle de banda
+    destruir_trafego
+
+    # Download
+    $TC qdisc add dev $I_LAN1 root handle 1 cbq bandwidth 10Mbit avpkt 1000 cell 8
+    $TC class change dev $I_LAN1 root cbq weight 1Mbit allot 1514
+
+    # upload
+    $TC qdisc add dev $I_WAN root handle 1 cbq bandwidth 10Mbit avpkt 1000 cell 8
+    $TC class change dev $I_WAN root cbq weight 1Mbit allot 1514
+
+    # Cache full
+    $TC class add dev $I_LAN1 parent 1: classid 1:999 cbq bandwidth 10Mbit rate 10Mbit weight 1Mbit prio 4 allot 1514 cell 8 maxburst 20 avpkt 1000 bounded
+    $TC qdisc add dev $I_LAN1 parent 1:999 handle 999 tbf rate 10Mbit buffer 10Kb/8 limit 15Kb mtu 1500
+    $TC filter add dev $I_LAN1 parent 1:0 protocol ip prio 3 u32 match ip protocol 0x6 0xff match ip tos 60 0xff classid 1:999
+}
+
+
+# Limpa o firewall
+function destruir_regras() {
+    # Configura a politca padrao para aceitar tudo
+    $IPT -P INPUT ACCEPT
+    $IPT -P OUTPUT ACCEPT
+    $IPT -P FORWARD ACCEPT
+    $IPT -t nat -P PREROUTING ACCEPT
+
+    # Limpa a tabela netfilter
+    $IPT -F
+    $IPT -X
+    $IPT -t nat -F
+    $IPT -t nat -X
+    $IPT -t mangle -F
+    $IPT -t mangle -X
+
+    echo "Firewall parado"
+}
+
+
+# Cria as regras de firewall
+function criar_regras() {
+
+    # Finaliza o script se nao existir o arquivo contendo os dados da rede
+    if [ ! -f $ARQUIVO ]; then
+        echo "Arquivo contendo os pontos de rede ($ARQUIVO) nao existe.";
+        exit 0
+    fi
+
+    # Carrega modulos do kernel
+    $MOD ip_tables
+    $MOD iptable_nat
+    $MOD ipt_MASQUERADE
+    $MOD ipt_LOG
+    $MOD ipt_REJECT
+    $MOD ip_conntrack_ftp
+    $MOD ip_nat_ftp
+
+    # Limpa todas as regras do firewall
+    destruir_regras
+
+    # Recria as regras para controle de banda
+    criar_trafego
+
+    # Cria os bloqueios padroes
+    $IPT -P INPUT DROP
+    $IPT -t nat -P PREROUTING DROP
+
+    # Habilita redirecionamento de IP
+    echo 1 > /proc/sys/net/ipv4/ip_forward
+
+    # Aumenta o limite do nf_conntrack_max
+    echo 99999 > /proc/sys/net/netfilter/nf_conntrack_max
+
+    # Libera acesso para pacotes vindos da internet
+    $IPT -t nat -A PREROUTING -s 0/0 -i $I_WAN -p all -j ACCEPT
+    $IPT -A INPUT -i $I_WAN -j ACCEPT
+
+    # Cria uma nova chain para tratar do proxy transparente
+    $IPT -t nat -N proxy
+        # O software conectividade social nao funciona se estiver passando pelo proxy
+        $IPT -t nat -A proxy -p tcp -d 200.201.174.0/16 --dport 80 -j ACCEPT
+        $IPT -t nat -A proxy -p tcp -d 200.201.173.0/16 --dport 80 -j ACCEPT
+        $IPT -t nat -A proxy -p tcp -d 200.201.0.0/16 --dport 80 -j ACCEPT
+        $IPT -t nat -A proxy -p tcp -d 200.201.174.207 --dport 80 -j ACCEPT
+
+        # Internet Caixa nao passa pelo proxy
+        $IPT -t nat -A proxy -p tcp -d 200.201.169.0/8 --dport 80 -j ACCEPT
+        $IPT -t nat -A proxy -p tcp -d 200.201.169.69 --dport 80 -j ACCEPT
+
+        # Proxy transparente redirecionando os pacotes para a porta do Squid
+        $IPT -t nat -A proxy -s 0/0 -p tcp --dport 80 -j DNAT --to-dest $PROXY_SERVER
+
+        # Se o pacote nao for pra porta 80, deixa passar
+        $IPT -t nat -A proxy -i $I_LAN1 -j ACCEPT
+
+    # Libera o IP abaixo sem amarrar com MAC e sem passar pelo proxy
+    #$IPT -t nat -A PREROUTING -i $I_LAN1 -s 192.168.254.2 -j ACCEPT
+
+    # Configuracao inicial do dhcpd.conf
+    echo "# Arquivo dhcpd.conf criado pelo SIGEP" > $DHCPDCONF
+    echo "ddns-update-style none;" >> $DHCPDCONF
+    echo "option domain-name \"$DOMINIO\";" >> $DHCPDCONF
+    echo "option domain-name-servers $NAMESERVERS;" >> $DHCPDCONF
+    echo "default-lease-time 600;" >> $DHCPDCONF
+    echo "max-lease-time 7200;" >> $DHCPDCONF
+    echo "authoritative;" >> $DHCPDCONF
+    echo "shared-network 0-2 {" >> $DHCPDCONF
+    echo "  subnet $CLASSE_LAN1"."0 netmask $NETMASK { range $CLASSE_LAN1.80 $CLASSE_LAN1.90; }" >> $DHCPDCONF
+    echo "}" >> $DHCPDCONF
+
+    # Inicio do loop para liberao e bloqueio de clientes
+    for i in `cat $ARQUIVO`; do
+        CODIGO=$(echo $i | awk -F "-" {'print $1'})
+        IP=$(echo $i | awk -F "-" {'print $3'})
+        MAC=$(echo $i | awk -F "-" {'print $4'})
+        DOWNLOAD=$(echo $i | awk -F "-" {'print $5'})
+        UPLOAD=$(echo $i | awk -F "-" {'print $6'})
+        POSSUI_ACESSO_LIBERADO=$(echo $i | awk -F "-" {'print $7'})
+        VAI_USAR_PROXY=$(echo $i | awk -F "-" {'print $8'})
+
+        # Configurar dhcpd para associar IP ao MAC
+        if [ "$MAC" != "" ]; then
+          LINHA="host $CODIGO { hardware ethernet $MAC; fixed-address $IP; option subnet-mask $NETMASK; option routers $GATEWAY_IP; option domain-name-servers $DNS_SERVERS; }"
+          echo $LINHA >> $DHCPDCONF
+        fi
+
+        # Se o IP nao esta liberado, bloqueia no firewall
+        if [ "$POSSUI_ACESSO_LIBERADO" == "False" ]; then
+            EXECUTAR_REGRA="$IPT -t nat -A PREROUTING -p tcp -i $I_LAN1 -s $IP -j DROP"
+        else
+            if [ "$VAI_USAR_PROXY" == "True" ]; then
+                EXECUTAR_REGRA="$IPT -t nat -A PREROUTING -i $I_LAN1 -s $IP -m mac --mac-source $MAC -j proxy"
+            else
+                EXECUTAR_REGRA="$IPT -t nat -A PREROUTING -i $I_LAN1 -s $IP -j ACCEPT"
+            fi
+        fi
+
+        # Executa a regra para o IP selecionado no loop
+        $EXECUTAR_REGRA
+
+
+        # Aplica o controle de banda
+        WEIGHT_DOWN=$(expr $DOWNLOAD / 10)
+        ID_DOWN=1"$CODIGO"
+        $TC class add dev $I_LAN1 parent 1: classid 1:$ID_DOWN cbq bandwidth 10Mbit rate "$DOWNLOAD"Kbit weight "$WEIGHT_DOWN"Kbit prio 5 allot 1514 cell 8 maxburst 20 avpkt 1000 bounded
+        $TC filter add dev $I_LAN1 parent 1:0 protocol ip prio 100 u32 match ip dst $IP classid 1:$ID_DOWN
+
+        WEIGHT_UP=$(expr $UPLOAD / 10)
+        ID_UP=2"$CODIGO"
+        $TC class add dev $I_WAN parent 1: classid 1:$ID_UP cbq bandwidth 10Mbit rate "$UPLOAD"Kbit weight "$WEIGHT_UP"Kbit prio 5 allot 1514 cell 8 maxburst 20 avpkt 1000 bounded
+        $TC qdisc add dev $I_WAN parent 1:$ID_UP handle $ID_UP tbf rate "$UPLOAD"Kbit buffer 10Kb/8 limit 15Kb mtu 1500
+        $TC filter add dev $I_WAN parent 1:0 protocol ip prio 100 u32 match ip src $IP classid 1:$ID_UP
+
+    done
+
+    # Configuracao de firewall padrao
+    $IPT -t nat -A POSTROUTING -o $I_WAN -j MASQUERADE
+
+    # Bloqueio contra SYN-Flood
+    #echo 1 > /proc/sys/net/ipv4/tcp_syncookies
+
+    # Bloqueio contra Scanners Ocultos (Shealt Scan)
+    $IPT -A INPUT -p tcp --tcp-flags SYN,ACK,FIN,RST RST -m limit --limit 1/s -j DROP
+
+    # PING
+    $IPT -A INPUT -i $I_LAN1 -p icmp -j ACCEPT
+    $IPT -A INPUT -i $I_WAN -p icmp -j ACCEPT
+
+    # Libera acesso pra maquina local
+    $IPT -A INPUT -i lo -j ACCEPT
+    $IPT -A FORWARD -i lo -j ACCEPT
+
+    # HTTP e HTTPS
+    $IPT -A INPUT -p tcp --dport 80 -j ACCEPT
+    $IPT -A INPUT -p tcp --dport 443 -j ACCEPT
+
+    # Squid
+    $IPT -A INPUT -p tcp --dport 3128 -j ACCEPT
+
+    # SSH
+    $IPT -A INPUT -p tcp --dport 22 -j ACCEPT
+
+    # MySQL
+    $IPT -A INPUT -p tcp --dport 3306 -j ACCEPT
+
+    # DNS
+    $IPT -A INPUT -p udp --dport 53 -j ACCEPT
+
+    # SNMP
+    #$IPT -A INPUT -p udp --dport 160:162 -j ACCEPT
+
+    # Tratamento de conexoes TCP
+    $IPT -A INPUT -p tcp --syn -j DROP
+    $IPT -A INPUT -p tcp -m state --state ESTABLISHED,RELATED,NEW -j ACCEPT
+    $IPT -A INPUT -m limit --limit 3/minute --limit-burst 3 -j DROP
+
+    # Bloqueando pacotes estranhos
+    $IPT -A INPUT -p tcp --tcp-flags ALL FIN,URG,PSH -j DROP
+    $IPT -A INPUT -p tcp --tcp-flags ALL SYN,RST,ACK,FIN,URG -j DROP
+    $IPT -A INPUT -p tcp --tcp-flags ALL ALL -j DROP
+    $IPT -A INPUT -p tcp --tcp-flags ALL FIN -j DROP
+    $IPT -A INPUT -p tcp --tcp-flags SYN,RST SYN,RST -j DROP
+    $IPT -A INPUT -p tcp --tcp-flags SYN,FIN SYN,FIN -j DROP
+    $IPT -A INPUT -p tcp --tcp-flags ALL NONE -j DROP
+
+    echo "Firewall iniciado"
+}
+
+case $1 in
+    # Inicia o firewall e o dhcpd
+    start) criar_regras; $DHCPD_DAEMON stop ; $DHCPD_DAEMON start ; exit ;;
+
+    # Finaliza o firewall sem parar o dhcp
+    stop) destruir_regras; exit ;;
+
+    # Inicia o firewall sem mexer no dhcp
+    restart) criar_regras; exit ;;
+
+    # Finaliza o controle de banda
+    stoptraffic) destruir_trafego; exit ;;
+
+    # Se nenhum parametro for passado, mostra a ajuda
+    *) echo "Usage: $0 start|stop|restart|stoptraffic"; exit 1;;
+esac

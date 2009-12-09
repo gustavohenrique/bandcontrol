@@ -1,0 +1,108 @@
+{% extends 'admin/change_list.html' %}
+
+{% load rede %}
+
+{% block extrastyle %}
+  {{ block.super }}
+  <script type="text/javascript" src="{{ MEDIA_URL }}js/jquery.min.js"></script>
+
+  <script type="text/javascript">
+      function cadastrarPontoRede(id) {
+          if (id > 0) {
+              var desc, ip, mac, plano;
+              desc = $('#desc_'+id).val();
+              ip = $('#ip_'+id).val();
+              mac = $('#mac_'+id).val();
+              plano = $('#plano_'+id).val();
+              if (desc.length > 5 && ip.length > 7 && mac.length == 17 && plano > 0 ) {
+                  $('#frmCadastradas').attr('action','cadastrar/');
+                  $('#desc_'+id).attr('name','desc');
+                  $('#ip_'+id).attr('name','ip');
+                  $('#mac_'+id).attr('name','mac');
+                  $('#plano_'+id).attr('name','plano');
+                  $('#frmCadastradas').submit();
+              } else
+                  alert('Dados insuficientes.');
+          }
+      }
+
+      function liberarOuNegarPontoRede() {
+          var url_pontorede_checked = ''
+          var acao = $('select[name="action"]').val();
+          $('input[name="_selected_action"][checked=true]').each(function() {
+              url_pontorede_checked += '&id='+$(this).val();
+          })
+          if (url_pontorede_checked != '')
+              window.location.href = './action/?acao='+acao+url_pontorede_checked;
+          else
+              alert('Selecione algum item.');
+      }
+  </script>
+{% endblock %}
+
+{% block title %}Máquinas Conectadas{% endblock %}
+
+{% block breadcrumbs %}
+    <div class="breadcrumbs">
+        <a href="../">Voltar</a>
+    </div>
+{% endblock %}
+
+{% block content %}
+
+<h1>Máquinas Conectadas</h1>
+
+<div id="content-main">
+    <div id="changelist" class="module">
+        <form id="frmCadastradas" method="post" action="">
+            <div class="actions">
+                <label>Ação:
+                <select name="action">
+                    <option value="liberar">liberar acesso</option>
+                    <option value="negar">Negar acesso</option>
+                </select></label>
+                <button type="button" class="button" onclick="liberarOuNegarPontoRede()" title="Run the selected action" name="index" value="0">Ok</button>
+            </div>
+            <table cellspacing="0">
+              <thead>
+                <tr>
+                    <th style="width:15px"><input type="checkbox" id="action-toggle" style="display:inline;"></th>
+                    <th>Descrição</th>
+                    <th style="width:80px;">Liberado?</th>
+                    <th style="width:90px">IP</th>
+                    <th style="width:100px">MAC</th>
+                    <th style="width:110px">Plano</th>
+                    <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in conectados %}
+                    <tr class="{% cycle 'row1' 'row2' %}">
+                        <td>{% if item.id %}<input type="checkbox" name="_selected_action" class="action-select" value="{{ item.id }}">{% endif %}</td>
+                        <td><input type="text" name="" id="desc_{{ forloop.counter }}" value="{{ item.desc }}" maxlength="100" size="40"></td>
+                        <td>{{ item.liberado|boolean_icon }}</td>
+                        <td><input type="text" name="" id="ip_{{ forloop.counter }}" value="{{ item.ip }}" readonly="true" size="15"></td>
+                        <td><input type="text" name="" id="mac_{{ forloop.counter }}" value="{{ item.mac }}" readonly="true" size="15"></td>
+                        <td>
+                            <select name="" id="plano_{{ forloop.counter }}" style="width:100px;">
+                                {% for plano in planos %}
+                                    <option value="{{ plano.id }}"{% ifequal plano.id item.plano.id %} selected="selected"{% endifequal %}>{{ plano }}</option>
+                                {% endfor %}
+                            </select>
+                        </td>
+                        <td>
+                            {% if item.cadastrado %}
+                            {% else %}
+                                [<a href="#" onclick="javascript:cadastrarPontoRede({{ forloop.counter }})">+</a>]
+                            {% endif %}
+
+                        </td>
+                    </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            <p class="paginator">{{ conectados|length }} máquinas conectadas</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
