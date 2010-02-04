@@ -7,6 +7,7 @@
   {% if cl.formset %}
     <link rel="stylesheet" type="text/css" href="{% admin_media_prefix %}css/forms.css" />
     <script type="text/javascript" src="../../jsi18n/"></script>
+
   {% endif %}
   {{ media }}
   {% if not actions_on_top and not actions_on_bottom %}
@@ -20,6 +21,11 @@
 
 {% if not is_popup %}
   {% block breadcrumbs %}
+    <script type="text/javascript">
+        function confirmar(url) {
+            if (confirm('Tem certeza?')) window.location.href = url;
+        }
+    </script>
     <div class="breadcrumbs">
       <div style="float:left;">
           <a href="../../">
@@ -34,8 +40,8 @@
       </div>
 
       <div style="float:right;text-align:right">
-          <a href="./firewall/?executar=firewall">Executar Firewall</a> |
-          <a href="./firewall/?executar=stoptraffic">Parar Controle de Banda</a> |
+          <a href="#" onclick="javascript:confirmar('./firewall/?executar=firewall')">Executar Firewall</a> |
+          <a href="#" onclick="javascript:confirmar('./firewall/?executar=stoptraffic')">Parar Controle de Banda</a> |
           <a href="./conectados/">Exibir IPs Conectados</a>
       </div>
       <div style="clear:both"></div>

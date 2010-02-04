@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from django.db import models
-
+from unicodedata import normalize
 
 class Plano(models.Model):
     """
@@ -38,6 +38,11 @@ class PontoRede(models.Model):
 
     def __unicode__(self):
         return u'%s' % self.ip
+
+    def save(self):
+        desc = self.desc
+        self.desc = normalize('NFKD',desc).encode('ASCII','ignore')
+        super(PontoRede, self).save()
 
 
 """

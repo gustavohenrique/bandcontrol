@@ -19,10 +19,18 @@ class MACField(Field):
             if len(mac.split(':')) != 6:
                 raise ValidationError('MAC deve ser separado por dois pontos (:).')
         return mac
-            
-            
+
+
 class PontoRedeForm(ModelForm):
     mac = MACField(label='MAC', widget=TextInput(attrs={'maxlength':17}))
 
     class Meta:
         model = PontoRede
+
+
+class PontoRedeConectadoEnaoCadastradoForm(PontoRedeForm):
+
+    def clean(self):
+        self.cleaned_data['liberado'] = True
+        self.cleaned_data['usa_proxy'] = True
+        return self.cleaned_data

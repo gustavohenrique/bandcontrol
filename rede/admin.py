@@ -3,6 +3,7 @@ from django.contrib.admin import site, ModelAdmin
 from django.conf import settings
 from django.http import HttpResponseRedirect, HttpResponse
 from django.views.generic.simple import direct_to_template, redirect_to
+from django.views.decorators.cache import never_cache
 
 import os
 
@@ -71,16 +72,12 @@ class PontoRedeAdmin(ModelAdmin):
             return HttpResponse('Nao foi passado nenhum parametro via GET')
 
 
-    def conectados(self, request):
+    def _montar_lista_conectados(self, lista_ip):
         """
-        Exibe os IPs conectados.
+        Retorna uma lista contendo o IP, MAC e outros dados do ponto de rede
         """
-
-        arp_exec = os.popen('arp -n | grep -iv incomplet | grep -iv address | sort')
-        resultado_arp = arp_exec.readlines()
         conectados = []
-        planos = Plano.objects.all()
-        for item in resultado_arp:
+        for item in lista_ip:
             linha = item.split()
             ip = linha[0]
             mac = linha[2]
@@ -108,12 +105,45 @@ class PontoRedeAdmin(ModelAdmin):
                     'plano': ''
                 }
             conectados.append(dados_ponto)
+        return conectados
+
+    @never_cache
+    def conectados(self, request):
+        """
+        Obtém a lista de IPs conectados e exibe na tela.
+        """
+
+        arp_exec = os.popen(settings.ARP_COMMAND)
+        lista_ip = arp_exec.readlines()
+
+        planos = Plano.objects.all()
+
         context = {
-            'conectados': conectados, # IPs conectados
+            'conectados': self._montar_lista_conectados(lista_ip), # IPs conectados
             'planos': planos,         # planos cadastrados
             'media': self.media       # includes javascript do admin
         }
         return direct_to_template(request,'conectados.html',extra_context=context)
+
+
+    def _cadastrar_ponto_conectado(self, dados_ponto):
+        """
+        Cadastra um ponto de rede.
+        Por padrão deixa o IP desliberado e usando proxy.
+        """
+
+        form = PontoRedeConectadoEnaoCadastradoForm(dados_ponto)
+        if form.is_valid():
+            try:
+                form.save()
+                status = 'ok'
+            except:
+                status = 'error'
+        else:
+            for item in form.errors:
+                status = item
+
+        return status
 
 
     def cadastrar(self, request):
@@ -123,22 +153,16 @@ class PontoRedeAdmin(ModelAdmin):
         """
 
         if request.method == 'POST':
-            form = PontoRedeForm(request.POST)
-            form.liberado = False
-            form.usa_proxy = True
-            if form.is_valid:
-                try:
-                    form.save()
-                    return HttpResponseRedirect('../')
-                except Exception, e:
-                    return HttpResponse('falha %s' % form)
+            resultado = self._cadastrar_ponto_conectado(request.POST)
+            if resultado == 'ok':
+                return HttpResponseRedirect('../')
+            elif resultado == 'error':
+                return HttpResponse('Dados insuficientes para cadatrar')
             else:
-                return HttpResponse('invalido')
-                #return direct_to_template(request,'conectados.html',extra_context={'status':'error'})
+                return HttpResponse('Preencha corretamente o form')
 
-            return HttpResponse('post')
         else:
-            return HttpResponse('sem post')
+            return HttpResponse('Nenhum formulario enviado via POST')
 
 
     def liberar(self, request, queryset):

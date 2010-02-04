@@ -1,11 +1,12 @@
-ARQUIVO="$(dirname $0)/pontosderede.txt"     # Contem os pontos de rede cadastrados
+#ARQUIVO="$(dirname $0)/pontosderede.txt"     # Contem os pontos de rede cadastrados
+ARQUIVO="/var/www/xsol/projects/bandcontrol/scripts/pontosderede.txt"     # Contem os pontos de rede cadastrados
 
 MOD=$(which modprobe)                        # Comando para carregar modulos do kernel
 IPT=$(which iptables)                        # Caminho do iptables
 TC=$(which tc)                               # tc (pacote iproute2)
 
-I_WAN="eth1"                                 # Interface internet
-I_LAN1="eth0"                                # Interface Rede local
+I_WAN="eth0"                                 # Interface internet
+I_LAN1="eth1"                                # Interface Rede local
 
 GATEWAY_IP="192.168.254.254"
 NETMASK="255.255.255.0"

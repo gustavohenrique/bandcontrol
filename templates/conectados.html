@@ -14,8 +14,8 @@
               ip = $('#ip_'+id).val();
               mac = $('#mac_'+id).val();
               plano = $('#plano_'+id).val();
-              if (desc.length > 5 && ip.length > 7 && mac.length == 17 && plano > 0 ) {
-                  $('#frmCadastradas').attr('action','cadastrar/');
+              if (desc.length > 0 && ip.length > 7 && mac.length == 17 && plano > 0 ) {
+                  //$('#frmCadastradas').attr('action','./cadastrar/');
                   $('#desc_'+id).attr('name','desc');
                   $('#ip_'+id).attr('name','ip');
                   $('#mac_'+id).attr('name','mac');
@@ -23,7 +23,8 @@
                   $('#frmCadastradas').submit();
               } else
                   alert('Dados insuficientes.');
-          }
+          } else
+              alert('Nenhum item selecionado.');
       }
 
       function liberarOuNegarPontoRede() {
@@ -54,7 +55,7 @@
 
 <div id="content-main">
     <div id="changelist" class="module">
-        <form id="frmCadastradas" method="post" action="">
+        <form id="frmCadastradas" method="post" action="cadastrar/">
             <div class="actions">
                 <label>Ação:
                 <select name="action">
@@ -93,7 +94,7 @@
                         <td>
                             {% if item.cadastrado %}
                             {% else %}
-                                [<a href="#" onclick="javascript:cadastrarPontoRede({{ forloop.counter }})">+</a>]
+                                [<a href="javascript:cadastrarPontoRede({{ forloop.counter }})">+</a>]
                             {% endif %}
 
                         </td>

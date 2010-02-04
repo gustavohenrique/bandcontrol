@@ -1,6 +1,7 @@
 #!/bin/bash
 
-. "$(dirname $0)/CONFIG"
+#. "$(dirname $0)/CONFIG"
+. /var/www/xsol/projects/bandcontrol/scripts/CONFIG
 
 
 # Remove o controle de banda
@@ -15,17 +16,24 @@ function criar_trafego {
     destruir_trafego
 
     # Download
-    $TC qdisc add dev $I_LAN1 root handle 1 cbq bandwidth 10Mbit avpkt 1000 cell 8
-    $TC class change dev $I_LAN1 root cbq weight 1Mbit allot 1514
+    $TC qdisc add dev $I_LAN1 root handle 1 cbq bandwidth 100Mbit avpkt 1000 cell 8
+    $TC class change dev $I_LAN1 root cbq weight 10Mbit allot 1514
 
     # upload
-    $TC qdisc add dev $I_WAN root handle 1 cbq bandwidth 10Mbit avpkt 1000 cell 8
-    $TC class change dev $I_WAN root cbq weight 1Mbit allot 1514
+    $TC qdisc add dev $I_WAN root handle 1 cbq bandwidth 100Mbit avpkt 1000 cell 8
+    $TC class change dev $I_WAN root cbq weight 10Mbit allot 1514
 
     # Cache full
-    $TC class add dev $I_LAN1 parent 1: classid 1:999 cbq bandwidth 10Mbit rate 10Mbit weight 1Mbit prio 4 allot 1514 cell 8 maxburst 20 avpkt 1000 bounded
-    $TC qdisc add dev $I_LAN1 parent 1:999 handle 999 tbf rate 10Mbit buffer 10Kb/8 limit 15Kb mtu 1500
-    $TC filter add dev $I_LAN1 parent 1:0 protocol ip prio 3 u32 match ip protocol 0x6 0xff match ip tos 60 0xff classid 1:999
+    $TC class add dev $I_LAN1 parent 1: classid 1:9999 cbq bandwidth 100Mbit rate 100Mbit weight 10Mbit prio 4 allot 1514 cell 8 maxburst 20 avpkt 1000 bounded
+    #$TC qdisc add dev $I_LAN1 parent 1:9999 handle 9999 tbf rate 100Mbit buffer 10Kb/8 limit 15Kb mtu 1500
+    $TC filter add dev $I_LAN1 parent 1:0 protocol ip prio 3 u32 match ip protocol 0x6 0xff match ip tos 60 0xff classid 1:9999
+
+    #$TC filter add dev $I_LAN1 protocol ip parent 1:0 prio 1 u32 match ip sport 80 0xffff classid 1:9999
+    
+    $TC class add dev $I_WAN parent 1: classid 2:9999 cbq bandwidth 100Mbit rate 100Mbit weight 100Mbit prio 4 allot 1514 cell 8 maxburst 20 avpkt 1000 bounded
+    $TC qdisc add dev $I_WAN parent 2:9999 handle 9999 tbf rate 100Mbit buffer 10Kb/8 limit 15Kb mtu 1500
+    $TC filter add dev $I_WAN parent 1:0 protocol ip prio 3 u32 match ip protocol 0x6 0xff match ip tos 60 0xff classid 2:9999
+
 }
 
 
@@ -45,7 +53,7 @@ function destruir_regras() {
     $IPT -t mangle -F
     $IPT -t mangle -X
 
-    echo "Firewall parado"
+    #echo "Firewall parado"
 }
 
 
@@ -98,6 +106,11 @@ function criar_regras() {
         # Internet Caixa nao passa pelo proxy
         $IPT -t nat -A proxy -p tcp -d 200.201.169.0/8 --dport 80 -j ACCEPT
         $IPT -t nat -A proxy -p tcp -d 200.201.169.69 --dport 80 -j ACCEPT
+        
+        $IPT -t nat -A proxy -p tcp -d $GATEWAY_IP --dport 80 -j ACCEPT
+        $IPT -t nat -A proxy -p tcp -d 10.0.0.2 --dport 80 -j ACCEPT
+        $IPT -t nat -A proxy -p tcp -d 10.0.0.3 --dport 80 -j ACCEPT
+        $IPT -t nat -A proxy -p tcp -d 10.0.0.4 --dport 80 -j ACCEPT
 
         # Proxy transparente redirecionando os pacotes para a porta do Squid
         $IPT -t nat -A proxy -s 0/0 -p tcp --dport 80 -j DNAT --to-dest $PROXY_SERVER
@@ -109,10 +122,10 @@ function criar_regras() {
     #$IPT -t nat -A PREROUTING -i $I_LAN1 -s 192.168.254.2 -j ACCEPT
 
     # Configuracao inicial do dhcpd.conf
-    echo "# Arquivo dhcpd.conf criado pelo SIGEP" > $DHCPDCONF
+    echo "# Arquivo dhcpd.conf criado pelo sistema" > $DHCPDCONF
     echo "ddns-update-style none;" >> $DHCPDCONF
     echo "option domain-name \"$DOMINIO\";" >> $DHCPDCONF
-    echo "option domain-name-servers $NAMESERVERS;" >> $DHCPDCONF
+    echo "option domain-name-servers $DNS_SERVERS;" >> $DHCPDCONF
     echo "default-lease-time 600;" >> $DHCPDCONF
     echo "max-lease-time 7200;" >> $DHCPDCONF
     echo "authoritative;" >> $DHCPDCONF
@@ -165,6 +178,15 @@ function criar_regras() {
 
     done
 
+    $IPT -t mangle -A OUTPUT -p tcp --sport 22 -j TOS --set-tos 60
+    $IPT -t mangle -A OUTPUT -p tcp --sport 80 -j TOS --set-tos 60
+    $IPT -t mangle -A OUTPUT -p tcp --sport 8080 -j TOS --set-tos 60
+    
+    $IPT -t mangle -A OUTPUT -p tcp --sport 137:139 -j TOS --set-tos 60
+    $IPT -t mangle -A OUTPUT -p udp --sport 137:139 -j TOS --set-tos 60
+    $IPT -t mangle -A INPUT -p tcp --dport 137:139 -j TOS --set-tos 60
+    $IPT -t mangle -A INPUT -p udp --dport 137:139 -j TOS --set-tos 60
+
     # Configuracao de firewall padrao
     $IPT -t nat -A POSTROUTING -o $I_WAN -j MASQUERADE
 
@@ -184,6 +206,7 @@ function criar_regras() {
 
     # HTTP e HTTPS
     $IPT -A INPUT -p tcp --dport 80 -j ACCEPT
+    $IPT -A INPUT -p tcp --dport 8080 -j ACCEPT
     $IPT -A INPUT -p tcp --dport 443 -j ACCEPT
 
     # Squid
@@ -197,6 +220,9 @@ function criar_regras() {
 
     # DNS
     $IPT -A INPUT -p udp --dport 53 -j ACCEPT
+
+    $IPT -A INPUT -p tcp --dport 137:139 -j ACCEPT
+    $IPT -A INPUT -p udp --dport 137:139 -j ACCEPT
 
     # SNMP
     #$IPT -A INPUT -p udp --dport 160:162 -j ACCEPT
@@ -220,7 +246,10 @@ function criar_regras() {
 
 case $1 in
     # Inicia o firewall e o dhcpd
-    start) criar_regras; $DHCPD_DAEMON stop ; $DHCPD_DAEMON start ; exit ;;
+    start) criar_regras; $DHCPD_DAEMON stop; $DHCPD_DAEMON start; exit ;;
+    
+    # Inicia sem reiniciar o dhcpd
+    nodhcp) criar_regras; exit ;;
 
     # Finaliza o firewall sem parar o dhcp
     stop) destruir_regras; exit ;;
@@ -232,5 +261,5 @@ case $1 in
     stoptraffic) destruir_trafego; exit ;;
 
     # Se nenhum parametro for passado, mostra a ajuda
-    *) echo "Usage: $0 start|stop|restart|stoptraffic"; exit 1;;
+    *) echo "Usage: $0 start|stop|restart|stoptraffic|nodhcp"; exit 1;;
 esac
