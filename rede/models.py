@@ -2,6 +2,9 @@
 from django.db import models
 from unicodedata import normalize
 
+from cliente.models import Cliente
+
+
 class Plano(models.Model):
     """
     Plano de acesso definindo a velocidade de
@@ -24,10 +27,11 @@ class PontoRede(models.Model):
     Ponto de Rede presente na rede.
     """
 
+    cliente = models.ForeignKey(Cliente, blank=True, null=True)
     plano = models.ForeignKey(Plano)
     desc = models.CharField(max_length=100, verbose_name=u'Descrição', unique=True)
     ip = models.IPAddressField(verbose_name='IP', unique=True)
-    mac = models.CharField(max_length=18, blank=True, null=True, verbose_name='MAC')
+    mac = models.CharField(max_length=18, blank=True, null=True, verbose_name='MAC', help_text=u'Ex.: aa:bb:cc:dd:ee:ff')
     liberado = models.BooleanField(default=True, verbose_name='Liberado')
     usa_proxy = models.BooleanField(default=True, verbose_name='Usa Proxy?')
 
