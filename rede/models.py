@@ -22,16 +22,60 @@ class Plano(models.Model):
         return self.nome
 
 
+class Servidor(models.Model):
+    """
+    Servidor entre o gateway e a internet.
+    """
+
+    INTERFACE_CHOICES = (
+        ('eth0','eth0'),
+        ('eth1','eth1'),
+        ('eth2','eth2'),
+        ('eth3','eth3'),
+        ('wlan0','wlan0'),
+        ('wlan1','wlan1'),
+        ('wlan2','wlan2'),
+    )
+
+    nome = models.SlugField(max_length=100, unique=True)
+    ip = models.IPAddressField(verbose_name='IP', unique=True)
+    interface_rede = models.CharField(max_length=5, choices=INTERFACE_CHOICES, verbose_name=u'Interface de Rede')
+
+    class Meta:
+        verbose_name_plural = 'servidores'
+
+    def __unicode__(self):
+        return self.ip
+
+
+class AccessPoint(models.Model):
+    """
+    Ponto de acesso o qual cada IP cliente está conectado.
+    """
+
+    nome = models.SlugField(max_length=100, unique=True)
+    ip = models.IPAddressField(verbose_name='IP', unique=True)
+    local = models.SlugField(max_length=100)
+
+    class Meta:
+        verbose_name_plural = 'access point'
+
+    def __unicode__(self):
+        return self.nome
+
+
 class PontoRede(models.Model):
     """
     Ponto de Rede presente na rede.
     """
 
     cliente = models.ForeignKey(Cliente, blank=True, null=True)
+    servidor =  models.ForeignKey(Servidor, blank=True, null=True, verbose_name=u'Rota padrão')
+    ap =  models.ForeignKey(AccessPoint, blank=True, null=True)
     plano = models.ForeignKey(Plano)
     desc = models.CharField(max_length=100, verbose_name=u'Descrição', unique=True)
     ip = models.IPAddressField(verbose_name='IP', unique=True)
-    mac = models.CharField(max_length=18, blank=True, null=True, verbose_name='MAC', help_text=u'Ex.: aa:bb:cc:dd:ee:ff')
+    mac = models.CharField(max_length=18, blank=True, null=True, verbose_name='MAC')
     liberado = models.BooleanField(default=True, verbose_name='Liberado')
     usa_proxy = models.BooleanField(default=True, verbose_name='Usa Proxy?')
 

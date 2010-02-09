@@ -18,8 +18,18 @@ class PlanoAdmin(ModelAdmin):
 site.register(Plano, PlanoAdmin)
 
 
+class ServidorAdmin(ModelAdmin):
+    list_display = ('nome','ip','interface_rede')
+site.register(Servidor, ServidorAdmin)
+
+
+class AccessPointAdmin(ModelAdmin):
+    list_display = ('nome','ip','local')
+site.register(AccessPoint, AccessPointAdmin)
+
+
 class PontoRedeAdmin(ModelAdmin):
-    list_display = ('desc','ip','mac','plano','liberado','usa_proxy')
+    list_display = ('desc','ip','mac','plano','ap','liberado','usa_proxy')
     list_filter = ('liberado','plano')
     search_fields = ['desc','ip','mac']
     form = PontoRedeForm
