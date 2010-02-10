@@ -16,6 +16,8 @@ from rede.models import *
 
 
 class PontoRedeTest(TestCase):
+    fixtures = ['rede.json','cliente.json']
+
     def test_exibir_2_pontos_conectados_nao_cadastrados(self):
 
         ip1 = '192.168.254.254          ether   00:21:91:7b:02:71'
@@ -62,6 +64,15 @@ class PontoRedeTest(TestCase):
         self.assertEquals([True, True], [ponto.liberado, ponto.usa_proxy])
 
 
+    def test_criar_novo_arquivo_pontosderede(self):
+        p = PontoRedeAdmin(PontoRede, AdminSite)
+        novo_arquivo_pontosrede = p._novo_arquivo_pontosrede()
+        resultado_esperado = {
+            'total_liberados': 1,
+            'total_negados': 0,
+            'linha_arquivo_texto': u'1-GUSTAVO_HENRIQUE-10.0.0.10-00:00:00:00:00:FF-128-64-True-True-192.168.0.1\n'
+        }
+        self.assertEquals(resultado_esperado, novo_arquivo_pontosrede)
 
 
 __test__ = {"doctest": """

@@ -1,0 +1,1 @@
+[{"pk": 1, "model": "rede.plano", "fields": {"download": 128, "upload": 64, "nome": "128K"}}]

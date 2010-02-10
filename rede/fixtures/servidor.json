@@ -1,0 +1,1 @@
+[{"pk": 1, "model": "rede.servidor", "fields": {"interface_rede": "eth1", "ip": "192.168.0.1", "nome": "Velox"}}]

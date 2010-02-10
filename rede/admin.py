@@ -216,11 +216,44 @@ class PontoRedeAdmin(ModelAdmin):
             return HttpResponse('Nenhum dado passado via GET.')
 
 
+    def _novo_arquivo_pontosrede(self):
+        """
+        Cria um novo arquivo texto contendo os dados de cada ponto de rede
+        usados pelos scripts de firewall e controle de banda.
+        """
+
+        linha_arquivo_texto = ''
+        total_liberados = 0
+        pontos_de_rede = PontoRede.objects.all()
+        for ponto in pontos_de_rede:
+            if ponto.liberado:
+                total_liberados += 1
+
+            # ID - Desc - IP - MAC - Download - Upload - Liberado - Proxy
+            linha_arquivo_texto += '%s-%s-%s-%s-%s-%s-%s-%s-%s\n' % (ponto.id, ponto.desc.replace(' ','_'), ponto.ip, ponto.mac.upper(), ponto.plano.download, ponto.plano.upload, ponto.liberado, ponto.usa_proxy, ponto.servidor.ip)
+
+        # Calcula o total de IPs bloqueados
+        total_negados = pontos_de_rede.count() - total_liberados
+
+        # Salva o conteudo no arquivo texto
+        arq = open(settings.FIREWALL_TXT_FILE, 'wb')
+        arq.write(linha_arquivo_texto)
+        arq.close()
+
+        resultado = {
+            'total_liberados': total_liberados,
+            'total_negados': total_negados,
+            'linha_arquivo_texto': linha_arquivo_texto
+        }
+
+        return resultado
+
+
     def changelist_view(self, request, extra_context=None, **kwargs):
         """
         Sobrescreve o metodo changelist_view responsavel por exibir os dados do objeto,
         adicionando o total de IPs liberados e negados.
-        Cria o arquivo texto usado pelos shell scripts de firewall e controle de banda.
+        Cria o arquivo texto usado pelos scripts de firewall e controle de banda.
         """
 
         from django.contrib.admin.views.main import ChangeList
@@ -236,27 +269,11 @@ class PontoRedeAdmin(ModelAdmin):
         if extra_context is None:
             extra_context = {}
 
-        linha_arquivo_texto = ''
-        total_liberados = 0
-        pontos_de_rede = PontoRede.objects.all()
-        for ponto in pontos_de_rede:
-            if ponto.liberado:
-                total_liberados += 1
-
-            # ID - Desc - IP - MAC - Download - Upload - Liberado - Proxy
-            linha_arquivo_texto += '%s-%s-%s-%s-%s-%s-%s-%s\n' % (ponto.id, ponto.desc.replace(' ','_'), ponto.ip, ponto.mac.upper(), ponto.plano.download, ponto.plano.upload, ponto.liberado, ponto.usa_proxy)
-
-        # Calcula o total de IPs bloqueados
-        total_negados = pontos_de_rede.count() - total_liberados
-
-        # Salva o conteudo no arquivo texto
-        arq = open(settings.FIREWALL_TXT_FILE, 'wb')
-        arq.write(linha_arquivo_texto)
-        arq.close()
+        novo_arquivo_pontosrede = self._novo_arquivo_pontosrede()
 
         extra_context['cl'] = cl
-        extra_context['total_liberados'] = total_liberados
-        extra_context['total_negados'] = total_negados
+        extra_context['total_liberados'] = novo_arquivo_pontosrede['total_liberados']
+        extra_context['total_negados'] = novo_arquivo_pontosrede['total_negados']
         return super(PontoRedeAdmin, self).changelist_view(request, extra_context=extra_context)
 
 site.register(PontoRede, PontoRedeAdmin)

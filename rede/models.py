@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from django.db import models
 from unicodedata import normalize
+#from django.template.defaultfilters import slugify
 
 from cliente.models import Cliente
 
@@ -73,7 +74,7 @@ class PontoRede(models.Model):
     servidor =  models.ForeignKey(Servidor, blank=True, null=True, verbose_name=u'Rota padrão')
     ap =  models.ForeignKey(AccessPoint, blank=True, null=True)
     plano = models.ForeignKey(Plano)
-    desc = models.CharField(max_length=100, verbose_name=u'Descrição', unique=True)
+    desc = models.CharField(max_length=100, verbose_name=u'Descrição', blank=True, null=True)
     ip = models.IPAddressField(verbose_name='IP', unique=True)
     mac = models.CharField(max_length=18, blank=True, null=True, verbose_name='MAC')
     liberado = models.BooleanField(default=True, verbose_name='Liberado')
@@ -88,8 +89,12 @@ class PontoRede(models.Model):
         return u'%s' % self.ip
 
     def save(self):
-        desc = self.desc
-        self.desc = normalize('NFKD',desc).encode('ASCII','ignore')
+        if self.cliente:
+            nova_desc = self.cliente.nome
+        else:
+            nova_desc = normalize('NFKD',self.desc).encode('ASCII','ignore')
+
+        self.desc = nova_desc
         super(PontoRede, self).save()
 
 

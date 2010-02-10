@@ -1,0 +1,1 @@
+[{"pk": 1, "model": "cliente.bairro", "fields": {"nome": "centro"}}, {"pk": 1, "model": "cliente.cliente", "fields": {"nome": "GUSTAVO HENRIQUE", "bairro": 1, "logradouro": "rua 1", "numero": "336", "celular": "", "telefone": "", "inicio_contrato": "2010-02-09"}}]
