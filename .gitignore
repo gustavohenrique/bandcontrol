@@ -1,0 +1,16 @@
+.coverage
+*~
+
+*.pyc
+*.swp
+*.db
+*.sqlite
+*.egg-info
+
+reports
+coverage.xml
+nosetests.xml
+pep8.report
+pylint.out
+pylint.report
+dist
