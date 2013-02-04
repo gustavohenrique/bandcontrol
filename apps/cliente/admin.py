@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 from django.contrib.admin import site, ModelAdmin
-import os
 
 from cliente.models import *
 from cliente.forms import ClienteForm

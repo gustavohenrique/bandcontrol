@@ -229,8 +229,14 @@ class PontoRedeAdmin(ModelAdmin):
             if ponto.liberado:
                 total_liberados += 1
 
+            ip_servidor='0.0.0.0'
+            try:
+               ip_servidor = ponto.servidor.ip
+            except:
+               pass
+
             # ID - Desc - IP - MAC - Download - Upload - Liberado - Proxy
-            linha_arquivo_texto += '%s-%s-%s-%s-%s-%s-%s-%s-%s\n' % (ponto.id, ponto.desc.replace(' ','_'), ponto.ip, ponto.mac.upper(), ponto.plano.download, ponto.plano.upload, ponto.liberado, ponto.usa_proxy, ponto.servidor.ip)
+            linha_arquivo_texto += '%s-%s-%s-%s-%s-%s-%s-%s-%s\n' % (ponto.id, ponto.desc.replace(' ','_'), ponto.ip, ponto.mac.upper(), ponto.plano.download, ponto.plano.upload, ponto.liberado, ponto.usa_proxy, ip_servidor)
 
         # Calcula o total de IPs bloqueados
         total_negados = pontos_de_rede.count() - total_liberados
@@ -255,13 +261,13 @@ class PontoRedeAdmin(ModelAdmin):
         adicionando o total de IPs liberados e negados.
         Cria o arquivo texto usado pelos scripts de firewall e controle de banda.
         """
-
         from django.contrib.admin.views.main import ChangeList
         cl = ChangeList(request, self.model, list(self.list_display),
                         self.list_display_links, self.list_filter,
                         self.date_hierarchy, self.search_fields,
                         self.list_select_related,
                         self.list_per_page,
+                        self.list_max_show_all,
                         self.list_editable,
                         self)
         cl.formset = None

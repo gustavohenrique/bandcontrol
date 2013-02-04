@@ -1,5 +1,5 @@
 #ARQUIVO="$(dirname $0)/pontosderede.txt"     # Contem os pontos de rede cadastrados
-ARQUIVO="/var/www/xsol/projects/bandcontrol/scripts/pontosderede.txt"     # Contem os pontos de rede cadastrados
+ARQUIVO="/var/www/bandcontrol/projects/bandcontrol/scripts/pontosderede.txt"     # Contem os pontos de rede cadastrados
 
 MOD=$(which modprobe)                        # Comando para carregar modulos do kernel
 IPT=$(which iptables)                        # Caminho do iptables
@@ -11,9 +11,9 @@ I_LAN1="eth1"                                # Interface Rede local
 GATEWAY_IP="192.168.254.254"
 NETMASK="255.255.255.0"
 CLASSE_LAN1="192.168.254"                    # Classe de IP utilizada na rede local. Ex.: 10.0
-PROXY_SERVER="$GATEWAY_IP:3128"                # IP do servidor proxy e a porta utilizada pelo squid
+PROXY_SERVER="$GATEWAY_IP:3128"              # IP do servidor proxy e a porta utilizada pelo squid
 
 DHCPD_DAEMON="/etc/init.d/dhcp3-server"      # Executavel do dhcp server
 DHCPDCONF="/etc/dhcp3/dhcpd.conf"            # Arquivo de configuracao do dhcp
-DOMINIO="xsol.local.br"                      # Dominio
+DOMINIO="bandcontrol.local.br"                      # Dominio
 DNS_SERVERS="$GATEWAY_IP, 8.8.8.8, 4.2.2.2"  # Servidores DNS. O primeiro é o próprio gateway

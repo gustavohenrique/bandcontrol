@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #. "$(dirname $0)/CONFIG"
-. /var/www/xsol/projects/bandcontrol/scripts/CONFIG
+. /var/www/bandcontrol/projects/bandcontrol/scripts/CONFIG
 
 
 # Remove o controle de banda
