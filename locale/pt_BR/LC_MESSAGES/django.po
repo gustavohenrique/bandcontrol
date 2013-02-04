@@ -1,0 +1,5 @@
+msgid "Django site admin"
+msgstr "Bandcontrol"
+
+msgid "Django administration"
+msgstr "Bandcontrol"
