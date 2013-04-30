@@ -230,7 +230,7 @@ class PontoRedeAdmin(ModelAdmin):
                 total_liberados += 1
 
             # ID - Desc - IP - MAC - Download - Upload - Liberado - Proxy
-            linha_arquivo_texto += '%s-%s-%s-%s-%s-%s-%s-%s-%s\n' % (ponto.id, ponto.desc.replace(' ','_'), ponto.ip, ponto.mac.upper(), ponto.plano.download, ponto.plano.upload, ponto.liberado, ponto.usa_proxy, ponto.servidor.ip)
+            linha_arquivo_texto += '%s-%s-%s-%s-%s-%s-%s-%s\n' % (ponto.id, ponto.desc.replace(' ','_'), ponto.ip, ponto.mac.upper(), ponto.plano.download, ponto.plano.upload, ponto.liberado, ponto.usa_proxy)
 
         # Calcula o total de IPs bloqueados
         total_negados = pontos_de_rede.count() - total_liberados
